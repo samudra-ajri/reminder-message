@@ -35,7 +35,7 @@
                         "header": [],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"birthday\": \"1990-11-01\",\n    \"location\": \"America/New_York\"\n}",
+                            "raw": "{\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"email\": \"john.doe@example.com\",\n    \"birthday\": \"1990-11-01\",\n    \"location\": \"America/New_York\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"

@@ -53,7 +53,7 @@ export const messageWorker = new Worker(
     try {
       // Execute external call
       const response = await axios.post(externalEmailApiUrl, {
-        email: emailData.email || 'test@example.com', // placeholder, assuming the system might expand to have real emails later
+        email: emailData.email,
         message: emailData.message,
       }, {
         timeout: 5000, // Handle timeout

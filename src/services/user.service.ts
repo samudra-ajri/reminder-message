@@ -9,7 +9,7 @@ export class UserService {
     this.userRepository = new UserRepository();
   }
 
-  async createUser(data: { firstName: string; lastName: string; birthday: string; location: string }): Promise<User> {
+  async createUser(data: { firstName: string; lastName: string; email: string; birthday: string; location: string }): Promise<User> {
     // Validate timezone
     if (!DateTime.local().setZone(data.location).isValid) {
       throw new Error(`Invalid timezone location: ${data.location}`);
@@ -24,6 +24,7 @@ export class UserService {
     return this.userRepository.create({
       firstName: data.firstName,
       lastName: data.lastName,
+      email: data.email,
       birthday: birthdayDate,
       location: data.location,
     });
@@ -35,13 +36,14 @@ export class UserService {
     return this.userRepository.delete(id);
   }
 
-  async updateUser(id: number, data: Partial<{ firstName: string; lastName: string; birthday: string; location: string }>): Promise<User> {
+  async updateUser(id: number, data: Partial<{ firstName: string; lastName: string; email: string; birthday: string; location: string }>): Promise<User> {
     const user = await this.userRepository.findById(id);
     if (!user) throw new Error('User not found');
 
     const updateData: Prisma.UserUpdateInput = {};
     if (data.firstName) updateData.firstName = data.firstName;
     if (data.lastName) updateData.lastName = data.lastName;
+    if (data.email) updateData.email = data.email;
     
     if (data.location) {
       if (!DateTime.local().setZone(data.location).isValid) {

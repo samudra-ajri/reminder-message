@@ -10,12 +10,12 @@ export class UserController {
 
   create = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { firstName, lastName, birthday, location } = req.body;
-      if (!firstName || !lastName || !birthday || !location) {
-        res.status(400).json({ error: 'Missing required fields: firstName, lastName, birthday, location' });
+      const { firstName, lastName, email, birthday, location } = req.body;
+      if (!firstName || !lastName || !email || !birthday || !location) {
+        res.status(400).json({ error: 'Missing required fields: firstName, lastName, email, birthday, location' });
         return;
       }
-      const user = await this.userService.createUser({ firstName, lastName, birthday, location });
+      const user = await this.userService.createUser({ firstName, lastName, email, birthday, location });
       res.status(201).json(user);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

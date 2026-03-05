@@ -18,7 +18,7 @@ export class TimezoneUtil {
     }
 
     return {
-      shouldSend: localTime.hour >= 9,
+      shouldSend: localTime.hour >= 9, // 9 a.m.
       currentMonth: localTime.month,
       currentDay: localTime.day,
       currentYear: localTime.year,

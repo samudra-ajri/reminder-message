@@ -21,7 +21,7 @@ export class CronService {
 
         if (shouldSend) {
           const usersToGreet = await prisma.$queryRaw<any[]>`
-            SELECT u.id, u."firstName", u."lastName"
+            SELECT u.id, u."firstName", u."lastName", u.email
             FROM "User" u
             LEFT JOIN "OutboxMessage" o 
               ON u.id = o."userId" 
@@ -42,7 +42,10 @@ export class CronService {
               userId: user.id,
               eventYear: currentYear,
               eventType: MessageType.BIRTHDAY,
-              emailData: { message }
+              emailData: { 
+                message,
+                email: user.email 
+              }
             });
           }
         }

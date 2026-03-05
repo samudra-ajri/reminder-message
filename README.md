@@ -85,6 +85,7 @@ This project implements Clean Architecture and Domain-Driven Design principles w
 {
   "firstName": "John",
   "lastName": "Doe",
+  "email": "john.doe@example.com",
   "birthday": "1990-11-01",
   "location": "America/New_York"
 }
