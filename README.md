@@ -1,117 +1,108 @@
-# Birthday Greeting Message App
+# Birthday Reminder Service
 
-An automated birthday messaging application built with TypeScript, ExpressJS, PostgreSQL, Redis, and BullMQ. This service automatically sends a "Happy Birthday" message to users precisely at 9:00 AM in their local time zone.
+This project is a backend application that stores user data (with birthdays) and uses a worker process to automatically send a "Happy Birthday" message at 9 AM in their local time zone on their birthday.
 
-## Architecture & Features
+## Technology Stack
 
-This project implements Clean Architecture and Domain-Driven Design principles while strictly avoiding over-engineering:
-- **Clean Layers:** Clear separation concerns utilizing `Controller`, `Service`, and `Repository` layers.
-- **Dynamic Timezone Parsing:** Users specify their location's IANA timezone (e.g., `America/New_York`). The system dynamically resolves when it is 9:00 AM locally, correctly adjusting for Daylight Saving Time via `luxon`.
-- **Message Queue & Retries:** Powered by BullMQ. Asynchronous execution guarantees performance scale. The external mocked Email API call utilizes exponential backoff for resilience against transient errors.
-- **Idempotency & Recovery Mechanism:** Built to ensure duplicate messages are never sent. Uses a PostgreSQL `OutboxMessage` table with a UNIQUE constraint (`userId`, `eventType`, `eventYear`). If the server goes down, the Cron job will scan for missed birthdays (past 9 AM today) and retroactively send them upon recovery.
-- **Avoiding N+1 execution:** The queries use strategic outer joins to identify correct users natively in PostgreSQL, instead of sequentially checking in memory.
+- **Backend Framework:** Node.js with ExpressJS
+- **Language:** TypeScript
+- **Database:** MongoDB (using Mongoose)
+- **Scheduling/Worker:** node-cron
+- **Containerization:** Docker & Docker Compose
+- **Testing:** Jest & Supertest
 
-## Tech Stack
+## Architecture
 
-- **Node.js**: Backend JavaScript runtime.
-- **TypeScript**: Typed language.
-- **Express.js**: REST API Framework.
-- **PostgreSQL**: Primary Data Store.
-- **Prisma (v6)**: Type-safe modern ORM.
-- **Redis & BullMQ**: Lightning-fast message queue and worker execution.
-- **Jest**: Unit testing framework.
+The application follows Clean Architecture and Domain-Driven Design (DDD) principles:
+- **Controllers** handle HTTP requests and input validation (using Joi).
+- **Services** encapsulate the core business logic.
+- **Repositories** manage data access and database operations.
+- **Models** define Mongoose schemas and TypeScript interfaces.
 
----
+## Project Structure
 
-## Prerequisites
+```
+├── Dockerfile
+├── docker-compose.yml
+├── package.json
+├── src
+│   ├── app.ts                  # Express application setup
+│   ├── server.ts               # API server entry point
+│   ├── worker.ts               # Worker entry point
+│   ├── controllers             # Request handlers & validation
+│   ├── models                  # Mongoose models
+│   ├── repositories            # Database access
+│   ├── routes                  # Express routes
+│   ├── services                # Business logic & Cron scheduling
+│   └── utils                   # DB connection & utilities
+└── tests
+    ├── user.test.ts            # Unit tests for API endpoints
+    └── worker.test.ts          # Unit tests for the cron worker
+```
 
-- Node.js (v18+)
-- PostgreSQL installed and running locally.
-- Redis installed and running locally.
+## Running the Application with Docker
 
-## Getting Started
+Prerequisites: Make sure you have Docker and Docker Compose installed.
 
-1. **Clone the repository and install dependencies:**
+1. **Build and start the containers**
+   ```bash
+   docker-compose up --build
+   ```
+   This will spin up three containers:
+   - `mongodb`: The MongoDB database
+   - `api_service`: The Express REST API
+   - `worker_service`: The node-cron scheduling worker
+
+2. **Access the API**
+   The API will be accessible at `http://localhost:3000`.
+
+## API Documentation & Examples
+
+### 1. Create a User
+**POST** `/user`
+```json
+{
+  "name": "Jane Doe",
+  "email": "jane@example.com",
+  "birthday": "1990-05-15T00:00:00.000Z",
+  "timezone": "America/New_York"
+}
+```
+
+### 2. Get User by ID
+**GET** `/user/:id`
+Returns the user detail corresponding to the specific ID.
+
+### 3. Update User
+**PUT** `/user/:id`
+```json
+{
+  "name": "Jane Updated",
+  "timezone": "Asia/Jakarta"
+}
+```
+
+### 4. Delete User
+**DELETE** `/user/:id`
+Removes the user from the database.
+
+## Running Tests Locally
+
+To run tests without Docker, you will need Node.js installed locally.
+
+1. Install dependencies:
    ```bash
    npm install
    ```
 
-2. **Configure Environment Variables:**
-   A `.env` file should be present in the root directory. Ensure your `DATABASE_URL` is pointing to an active PostgreSQL database. Example:
-   ```env
-   DATABASE_URL="postgresql://postgres:postgres@localhost:5432/greeting?schema=public"
-   REDIS_HOST="localhost"
-   REDIS_PORT="6379"
-   REDIS_PASSWORD=""
-   PORT="3000"
-   EXTERNAL_EMAIL_API_URL="https://email-service.digitalenvision.com.au/send"
-   ```
-
-3. **Start Required Services:**
-   Ensure your local PostgreSQL and Redis servers are running.
-   For Mac users, you can run Redis via Homebrew:
+2. Run the tests:
    ```bash
-   brew services start redis
+   npm test
    ```
-   Or to just run it in the foreground:
-   ```bash
-   redis-server
-   ```
+   Tests use `mongodb-memory-server` for a fast, isolated database during testing.
 
-4. **Run Database Migrations:**
-   Sync the current application schema to your Postgres database:
-   ```bash
-   npx prisma db push
-   ```
-
-5. **Start the Application:**
-   This system is modularized into three services running concurrently. You can start them all parallel in development mode using:
-   ```bash
-   npm run dev
-   ```
-
-   *Alternatively, you can run them individually:*
-   - `npm run dev:api` (Express Server for CRUD)
-   - `npm run dev:worker` (BullMQ message execution worker)
-   - `npm run dev:scheduler` (Hourly Cron Job scanner)
-
-## API Endpoints
-
-### 1. Create a User
-**POST /api/user**
-
-**Body:**
-```json
-{
-  "firstName": "John",
-  "lastName": "Doe",
-  "email": "john.doe@example.com",
-  "birthday": "1990-11-01",
-  "location": "America/New_York"
-}
-```
-
-### 2. Update a User
-**PUT /api/user/:id**
-
-Allows users to update their information. If the timezone changes, the 9 AM logic dynamically adjusts.
-
-**Body:**
-```json
-{
-  "location": "Australia/Melbourne"
-}
-```
-
-### 3. Delete a User
-**DELETE /api/user/:id**
-Cascading automatically drops pending internal system Outbox messages.
-
-## Testing
-
-Jest is configured for testing business critical logic (like dynamic IANA timezone resolution). 
-
-To run tests:
-```bash
-npm test
-```
+## Design Decisions & Assumptions
+- **Database:** MongoDB was chosen to strictly fulfill the project requirements.
+- **Validation:** `joi` is used directly inside the controller to provide strict validation on the incoming requests.
+- **Worker/Scheduling:** Used `node-cron` scheduled to run every minute (`* * * * *`). It checks if the current time in the user's specific timezone matches 9:00 AM.
+- **Timezone Support:** IANA timezone validation is performed correctly and local times are resolved utilizing `moment-timezone`.

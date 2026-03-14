@@ -1,16 +1,16 @@
-import express from 'express';
-import cors from 'cors';
-import userRoutes from './routes/user.routes';
+import express from "express"
+import cors from "cors"
+import userRoutes from "./routes/user.routes"
 
-const app = express();
+const app = express()
 
-app.use(cors());
-app.use(express.json());
+app.use(cors())
+app.use(express.json())
 
-app.use('/api', userRoutes);
+app.use("/", userRoutes)
 
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK' });
-});
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "OK" })
+})
 
-export default app;
+export default app

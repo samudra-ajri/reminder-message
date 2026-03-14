@@ -1,20 +1,28 @@
-import { prisma } from '../utils/prisma';
-import { User, Prisma } from '@prisma/client';
+import { UserModel, IUser } from "../models/user.model"
 
 export class UserRepository {
-  async create(data: Prisma.UserCreateInput): Promise<User> {
-    return prisma.user.create({ data });
+  async create(data: Partial<IUser>): Promise<IUser> {
+    const user = new UserModel(data)
+    return await user.save()
   }
 
-  async delete(id: number): Promise<User> {
-    return prisma.user.delete({ where: { id } });
+  async findById(id: string): Promise<IUser | null> {
+    return await UserModel.findById(id)
   }
 
-  async update(id: number, data: Prisma.UserUpdateInput): Promise<User> {
-    return prisma.user.update({ where: { id }, data });
+  async findByEmail(email: string): Promise<IUser | null> {
+    return await UserModel.findOne({ email })
   }
 
-  async findById(id: number): Promise<User | null> {
-    return prisma.user.findUnique({ where: { id } });
+  async update(id: string, data: Partial<IUser>): Promise<IUser | null> {
+    return await UserModel.findByIdAndUpdate(id, data, { new: true })
+  }
+
+  async delete(id: string): Promise<IUser | null> {
+    return await UserModel.findByIdAndDelete(id)
+  }
+
+  async findAll(): Promise<IUser[]> {
+    return await UserModel.find()
   }
 }

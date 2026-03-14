@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: mongodb
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - app-network
+
+  api:
+    build: .
+    container_name: api_service
+    ports:
+      - '3000:3000'
+    environment:
+      - PORT=3000
+      - MONGO_URI=mongodb://mongodb:27017/birthday-service
+    depends_on:
+      - mongodb
+    networks:
+      - app-network
+    command: npm run start:api
+
+  worker:
+    build: .
+    container_name: worker_service
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/birthday-service
+    depends_on:
+      - mongodb
+    networks:
+      - app-network
+    command: npm run start:worker
+
+volumes:
+  mongodb_data:
+
+networks:
+  app-network:
+    driver: bridge

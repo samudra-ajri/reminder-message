@@ -1,57 +1,65 @@
-import { prisma } from '../utils/prisma';
-import { addGreetingJob } from '../queue/messageQueue';
-import { TimezoneUtil } from '../utils/timezone.util';
-import { MessageStatus, MessageType } from '../constants/message.constants';
+import cron from "node-cron"
+import moment from "moment-timezone"
+import { UserRepository } from "../repositories/user.repository"
+import { connectDB } from "../utils/db"
+import "dotenv/config"
 
 export class CronService {
-  async processBirthdaysAndSchedules() {
-    console.log(`Running cron job at UTC: ${new Date().toISOString()}`);
+  private userRepository: UserRepository
 
-    // Get all distinct timezones from our users
-    const uniqueLocations = await prisma.user.findMany({
-      select: { location: true },
-      distinct: ['location'],
-    });
+  constructor() {
+    this.userRepository = new UserRepository()
+  }
 
-    const now = new Date();
-
-    for (const { location } of uniqueLocations) {
+  start() {
+    console.log("Worker is starting, scheduling cron job every minute...")
+    // Run every minute
+    cron.schedule("* * * * *", async () => {
       try {
-        const { shouldSend, currentMonth, currentDay, currentYear } = TimezoneUtil.isTimeToSendBirthdayMessage(location, now);
+        await this.processBirthdays()
+      } catch (error) {
+        console.error("Error in cron job:", error)
+      }
+    })
+  }
 
-        if (shouldSend) {
-          const usersToGreet = await prisma.$queryRaw<any[]>`
-            SELECT u.id, u."firstName", u."lastName", u.email
-            FROM "User" u
-            LEFT JOIN "OutboxMessage" o 
-              ON u.id = o."userId" 
-              AND o."eventYear" = ${currentYear} 
-              AND o."eventType" = ${MessageType.BIRTHDAY}
-              AND o.status = ${MessageStatus.SENT}
-            WHERE u.location = ${location}
-              AND EXTRACT(MONTH FROM u.birthday) = ${currentMonth}
-              AND EXTRACT(DAY FROM u.birthday) = ${currentDay}
-              AND o.id IS NULL
-          `;
+  async processBirthdays() {
+    const users = await this.userRepository.findAll()
 
-          for (const user of usersToGreet) {
-            const fullName = `${user.firstName} ${user.lastName}`;
-            const message = `Hey, ${fullName} it's your birthday`;
-            
-            await addGreetingJob({
-              userId: user.id,
-              eventYear: currentYear,
-              eventType: MessageType.BIRTHDAY,
-              emailData: { 
-                message,
-                email: user.email 
-              }
-            });
-          }
+    for (const user of users) {
+      const timezone = user.timezone
+      if (!moment.tz.zone(timezone)) {
+        continue
+      }
+
+      const userLocalTime = moment().tz(timezone)
+
+      // Check if it's 9 AM (hour 9, minute 0)
+      if (userLocalTime.hour() === 9 && userLocalTime.minute() === 0) {
+        const userBirthday = moment(user.birthday).tz(timezone)
+
+        if (
+          userLocalTime.month() === userBirthday.month() &&
+          userLocalTime.date() === userBirthday.date()
+        ) {
+          this.sendBirthdayMessage(user.email, user.name)
         }
-      } catch (error: any) {
-        console.warn(`Error processing location ${location}:`, error.message);
       }
     }
   }
+
+  private sendBirthdayMessage(email: string, name: string) {
+    // Simulating sending an email or message
+    console.log(`Sending Happy Birthday message to ${email} (Name: ${name})`)
+    console.log(`"Happy Birthday, ${name}!"`)
+  }
+}
+
+// If run as a standalone worker process
+if (require.main === module) {
+  ;(async () => {
+    await connectDB()
+    const cronService = new CronService()
+    cronService.start()
+  })()
 }
