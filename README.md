@@ -14,6 +14,43 @@ This project is a backend application that stores user data (with birthdays) and
 ## Architecture
 
 The application follows Clean Architecture and Domain-Driven Design (DDD) principles:
+
+### Infrastructure & Process Flowchart
+
+```mermaid
+flowchart TD
+    %% Define Nodes
+    Client([Client / Postman])
+    API[Express API Service]
+    DB[(MongoDB Database)]
+    Worker([Node-Cron Worker])
+    Log[/Console Log / Email Service/]
+    
+    %% User Management Flow
+    Client -- "1. HTTP Request (POST/GET/PUT/DELETE)" --> API
+    API -- "2. Validates with Joi" --> API
+    API -- "3. CRUD Operations" --> DB
+    
+    %% Worker Flow
+    Worker -- "4. Triggered Every Minute (* * * * *)" --> W1[Fetch All Users]
+    W1 -- "5. Query Data" --> DB
+    DB -- "Return Users" --> W2{Iterate Each User}
+    
+    W2 --> W3{Valid IANA Timezone?}
+    W3 -- "No" --> W2
+    
+    W3 -- "Yes" --> W4{Is it exactly 9:00 AM\nin User's Local Time?}
+    W4 -- "No" --> W2
+    
+    W4 -- "Yes" --> W5{Is it User's Birthday\nToday?}
+    W5 -- "No" --> W2
+    
+    W5 -- "Yes" --> W6[Send 'Happy Birthday' Message]
+    W6 --> Log
+    W6 --> W2
+```
+
+### Components
 - **Controllers** handle HTTP requests and input validation (using Joi).
 - **Services** encapsulate the core business logic.
 - **Repositories** manage data access and database operations.
@@ -101,8 +138,19 @@ To run tests without Docker, you will need Node.js installed locally.
    ```
    Tests use `mongodb-memory-server` for a fast, isolated database during testing.
 
-## Design Decisions & Assumptions
-- **Database:** MongoDB was chosen to strictly fulfill the project requirements.
-- **Validation:** `joi` is used directly inside the controller to provide strict validation on the incoming requests.
-- **Worker/Scheduling:** Used `node-cron` scheduled to run every minute (`* * * * *`). It checks if the current time in the user's specific timezone matches 9:00 AM.
-- **Timezone Support:** IANA timezone validation is performed correctly and local times are resolved utilizing `moment-timezone`.
+## Notes: Assumptions, Limitations, and Design Decisions
+
+### Assumptions
+- **Payload Format:** It is assumed that API consumers will provide dates in strict ISO 8601 format. Timezones must be valid IANA timezone strings (e.g., `Asia/Jakarta`).
+- **Simulated Message:** Sending a real email is out of scope. Therefore, the implementation currently simulates sending the birthday message via a console log statement.
+- **Worker Independent:** The scheduling system operates on the assumption that the worker and API containers run continuously alongside each other without dropping process continuity. 
+
+### Limitations
+- **Downtime Vulnerability:** The cron worker currently checks `userLocalTime.hour() === 9 && userLocalTime.minute() === 0` without stateful tracking. If the server experiences downtime at exactly 9:00 AM for any user's timezone, their message will be missed for that year.
+- **Performance at Scale:** Currently, the worker fetches all users from the database into memory every minute using `.findAll()`. For a very large user base (e.g., millions of users), this would cause memory/CPU issues and require a batched stream or targeted database query using aggregation to scale properly.
+
+### Design Decisions
+- **Clean Architecture:** To strictly adhere to the *“Do not overengineer”* rule while keeping the app SOLID, a simple Controller-Service-Repository separation was used. It ensures testability and maintainability without creating unnecessary abstract classes or complex dependency injections.
+- **In-Memory Scheduling over Message Queues:** A simple `node-cron` approach was chosen over complex messaging brokers (like Redis + BullMQ). Given the scale and functional requirements, a stateless minute-by-minute evaluation of user data natively with Node.js fulfills the need cleanly and resiliently.
+- **Validation Library:** Migrated to `joi` for handling request schemas at the controller layer due to its strong error messaging features and robust ecosystem compatibility with ExpressJS.
+- **Minute-by-minute Worker Execution:** The node-cron worker checks time every minute `(* * * * *)` rather than every hour to effectively catch users residing in "fractional timezones" (e.g., India `UTC+5:30`, Nepal `UTC+5:45`).
