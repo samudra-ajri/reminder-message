@@ -12,7 +12,7 @@ const UserSchema: Schema = new Schema(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     birthday: { type: Date, required: true },
-    timezone: { type: String, required: true },
+    timezone: { type: String, required: true, index: true },
   },
   {
     timestamps: true,

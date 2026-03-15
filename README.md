@@ -32,22 +32,19 @@ flowchart TD
     API -- "3. CRUD Operations" --> DB
     
     %% Worker Flow
-    Worker -- "4. Triggered Every Minute (* * * * *)" --> W1[Fetch All Users]
-    W1 -- "5. Query Data" --> DB
-    DB -- "Return Users" --> W2{Iterate Each User}
+    Worker -- "4. Triggered Every Minute (* * * * *) -- Get Distinct User Timezones (via `UserModel.distinct('timezone')`)" --> DB
+    DB -- "Return Distinct Timezones" --> W1A[Loop through each Distinct Timezone]
+    W1A -- "Check if current local time is 9:00 AM for `tz` (`moment().tz(tz).hour() === 9 && .minute() === 0`)" --> W1B{Is 9:00 AM?}
+    W1B -- "No" --> W1A
+    W1B -- "Yes" --> W1C[Store `tz`, `month`, `day` as Target Conditions]
+    W1C --> W1A
+    W1A -- "All Timezones Checked" --> W2A[5.1 MongoDB Aggregation Pipeline (Filter by `timezone` using `$in`)]
+    W2A -- "Apply `$dateToParts` for `birthday` using `timezone`" --> W2B[5.2 MongoDB Aggregation Pipeline (Filter by `localBirthday.month` and `localBirthday.day`)]
+    W2B -- "Return Users with Birthday Today\nin those Timezones" --> W3{Iterate Target Users}
     
-    W2 --> W3{Valid IANA Timezone?}
-    W3 -- "No" --> W2
-    
-    W3 -- "Yes" --> W4{Is it exactly 9:00 AM\nin User's Local Time?}
-    W4 -- "No" --> W2
-    
-    W4 -- "Yes" --> W5{Is it User's Birthday\nToday?}
-    W5 -- "No" --> W2
-    
-    W5 -- "Yes" --> W6[Send 'Happy Birthday' Message]
+    W3 --> W6[Send 'Happy Birthday' Message (console.log)]
     W6 --> Log
-    W6 --> W2
+    W6 --> W3
 ```
 
 ### Components
@@ -146,10 +143,10 @@ To run tests without Docker, you will need Node.js installed locally.
 - **Worker Independent:** The scheduling system operates on the assumption that the worker and API containers run continuously alongside each other without dropping process continuity. 
 
 ### Limitations
-- **Downtime Vulnerability:** The cron worker currently checks `userLocalTime.hour() === 9 && userLocalTime.minute() === 0` without stateful tracking. If the server experiences downtime at exactly 9:00 AM for any user's timezone, their message will be missed for that year.
-- **Performance at Scale:** Currently, the worker fetches all users from the database into memory every minute using `.findAll()`. For a very large user base (e.g., millions of users), this would cause memory/CPU issues and require a batched stream or targeted database query using aggregation to scale properly.
+- **Downtime Vulnerability:** The cron worker currently checks for exactly 9:00 AM without stateful tracking. If the server experiences downtime at exactly 9:00 AM for any user's timezone, their message will be missed for that year.
 
 ### Design Decisions
+- **Optimized Database Aggregation for Scale:** Instead of fetching all users into memory, the worker dynamically calculates in Node.js which timezones are currently at 9 AM, and executes a targeted MongoDB Aggregation Pipeline query using `$dateToParts`. This ensures the application remains highly scalable and memory-efficient even for millions of users.
 - **Clean Architecture:** To strictly adhere to the *“Do not overengineer”* rule while keeping the app SOLID, a simple Controller-Service-Repository separation was used. It ensures testability and maintainability without creating unnecessary abstract classes or complex dependency injections.
 - **In-Memory Scheduling over Message Queues:** A simple `node-cron` approach was chosen over complex messaging brokers (like Redis + BullMQ). Given the scale and functional requirements, a stateless minute-by-minute evaluation of user data natively with Node.js fulfills the need cleanly and resiliently.
 - **Validation Library:** Migrated to `joi` for handling request schemas at the controller layer due to its strong error messaging features and robust ecosystem compatibility with ExpressJS.

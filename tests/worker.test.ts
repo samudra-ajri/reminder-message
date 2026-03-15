@@ -41,10 +41,12 @@ describe("Worker Functionality", () => {
       timezone: "Asia/Jakarta",
     }
 
-    userRepositoryMock.findAll.mockResolvedValue([mockUser])
+    // Mock system time to be exactly 9 AM in Jakarta
+    jest.useFakeTimers()
+    jest.setSystemTime(mockDate)
 
-    // Mock Date.now inside processBirthdays
-    jest.spyOn(Date, "now").mockImplementation(() => mockDate.getTime())
+    userRepositoryMock.getDistinctTimezones.mockResolvedValue(["Asia/Jakarta"])
+    userRepositoryMock.findUsersWithBirthdayToday.mockResolvedValue([mockUser])
 
     await cronService.processBirthdays()
 
@@ -52,32 +54,35 @@ describe("Worker Functionality", () => {
       "Sending Happy Birthday message to sam@example.com (Name: Sam)",
     )
     expect(console.log).toHaveBeenCalledWith('"Happy Birthday, Sam!"')
+
+    // Verify repository was called correctly
+    expect(userRepositoryMock.findUsersWithBirthdayToday).toHaveBeenCalled()
+
+    jest.useRealTimers()
   })
 
-  it("should NOT send message if it is not 9 AM", async () => {
+  it("should NOT send message if there are no users at 9 AM", async () => {
     const currentTime = moment.tz("Asia/Jakarta")
     const mockDate = currentTime
-      .hour(8)
+      .hour(8) // System time is 8 AM in Jakarta
       .minute(0)
       .second(0)
       .millisecond(0)
       .toDate()
 
-    const mockUser: any = {
-      name: "Sam",
-      email: "sam@example.com",
-      birthday: mockDate,
-      timezone: "Asia/Jakarta",
-    }
+    jest.useFakeTimers()
+    jest.setSystemTime(mockDate)
 
-    userRepositoryMock.findAll.mockResolvedValue([mockUser])
-
-    jest.spyOn(Date, "now").mockImplementation(() => mockDate.getTime())
+    userRepositoryMock.getDistinctTimezones.mockResolvedValue(["Asia/Jakarta"])
+    // Return empty array to simulate database behavior when no users match
+    userRepositoryMock.findUsersWithBirthdayToday.mockResolvedValue([])
 
     await cronService.processBirthdays()
 
     expect(console.log).not.toHaveBeenCalledWith(
       "Sending Happy Birthday message to sam@example.com (Name: Sam)",
     )
+
+    jest.useRealTimers()
   })
 })

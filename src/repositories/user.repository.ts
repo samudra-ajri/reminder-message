@@ -25,4 +25,43 @@ export class UserRepository {
   async findAll(): Promise<IUser[]> {
     return await UserModel.find()
   }
+
+  async getDistinctTimezones(): Promise<string[]> {
+    return await UserModel.distinct("timezone")
+  }
+
+  async findUsersWithBirthdayToday(
+    timezonesAt9AM: string[],
+    targetConditions: { timezones: string[]; month: number; day: number }[],
+  ): Promise<IUser[]> {
+    if (timezonesAt9AM.length === 0 || targetConditions.length === 0) {
+      return []
+    }
+
+    const orConditions = targetConditions.map((condition) => ({
+      timezone: { $in: condition.timezones },
+      "localBirthday.month": condition.month,
+      "localBirthday.day": condition.day,
+    }))
+
+    return await UserModel.aggregate([
+      {
+        $match: {
+          timezone: { $in: timezonesAt9AM },
+        },
+      },
+      {
+        $addFields: {
+          localBirthday: {
+            $dateToParts: { date: "$birthday", timezone: "$timezone" },
+          },
+        },
+      },
+      {
+        $match: {
+          $or: orConditions,
+        },
+      },
+    ])
+  }
 }

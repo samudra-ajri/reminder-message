@@ -24,27 +24,44 @@ export class CronService {
   }
 
   async processBirthdays() {
-    const users = await this.userRepository.findAll()
+    // Determine which timezones are currently at exactly 9:00 AM
+    // Optimize by only checking timezones that are actually used by users in the database
+    const allTimezones = await this.userRepository.getDistinctTimezones()
+    const targetConditionsMap: Record<
+      string,
+      { timezones: string[]; month: number; day: number }
+    > = {}
+    const timezonesAt9AM: string[] = []
+
+    for (const tz of allTimezones) {
+      const time = moment().tz(tz)
+      if (time.hour() === 9 && time.minute() === 0) {
+        timezonesAt9AM.push(tz)
+        const month = time.month() + 1 // MongoDB $dateToParts uses 1-12
+        const day = time.date()
+        const key = `${month}-${day}`
+
+        if (!targetConditionsMap[key]) {
+          targetConditionsMap[key] = { timezones: [], month, day }
+        }
+        targetConditionsMap[key].timezones.push(tz)
+      }
+    }
+
+    if (timezonesAt9AM.length === 0) {
+      return
+    }
+
+    const targetConditions = Object.values(targetConditionsMap)
+
+    // Only fetch users who match the timezone and local birthday criteria
+    const users = await this.userRepository.findUsersWithBirthdayToday(
+      timezonesAt9AM,
+      targetConditions,
+    )
 
     for (const user of users) {
-      const timezone = user.timezone
-      if (!moment.tz.zone(timezone)) {
-        continue
-      }
-
-      const userLocalTime = moment().tz(timezone)
-
-      // Check if it's 9 AM (hour 9, minute 0)
-      if (userLocalTime.hour() === 9 && userLocalTime.minute() === 0) {
-        const userBirthday = moment(user.birthday).tz(timezone)
-
-        if (
-          userLocalTime.month() === userBirthday.month() &&
-          userLocalTime.date() === userBirthday.date()
-        ) {
-          this.sendBirthdayMessage(user.email, user.name)
-        }
-      }
+      this.sendBirthdayMessage(user.email, user.name)
     }
   }
 
