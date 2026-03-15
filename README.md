@@ -32,18 +32,18 @@ flowchart TD
     API -- "3. CRUD Operations" --> DB
 
     %% Worker Flow
-    Worker -- "4. Run Every Minute (* * * * *)\nGet Distinct User Timezones" --> DB
+    Worker -- "4. Run Every Minute (* * * * *) Get Distinct User Timezones" --> DB
 
     DB -- "Return Distinct Timezones" --> W1A[Loop Through Each Timezone]
 
     W1A --> W1B{Is Local Time 09:00?}
 
     W1B -- "No" --> W1A
-    W1B -- "Yes" --> W1C[Store Timezone, Month, Day\nas Target Conditions]
+    W1B -- "Yes" --> W1C[Store Timezone, Month, Day as Target Conditions]
 
     W1C --> W1A
 
-    W1A -- "All Timezones Checked" --> W2A[Aggregation Pipeline\nFilter by Target Timezones]
+    W1A -- "All Timezones Checked" --> W2A[Aggregation Pipeline Filter by Target Timezones]
 
     W2A --> W2B[Extract Birthday Month and Day]
 
