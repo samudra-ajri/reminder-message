@@ -25,24 +25,33 @@ flowchart TD
     DB[(MongoDB Database)]
     Worker([Node-Cron Worker])
     Log[/Console Log / Email Service/]
-    
+
     %% User Management Flow
     Client -- "1. HTTP Request (POST/GET/PUT/DELETE)" --> API
-    API -- "2. Validates with Joi" --> API
+    API -- "2. Validate Request (Joi)" --> API
     API -- "3. CRUD Operations" --> DB
-    
+
     %% Worker Flow
-    Worker -- "4. Triggered Every Minute (* * * * *) -- Get Distinct User Timezones (via `UserModel.distinct('timezone')`)" --> DB
-    DB -- "Return Distinct Timezones" --> W1A[Loop through each Distinct Timezone]
-    W1A -- "Check if current local time is 9:00 AM for `tz` (`moment().tz(tz).hour() === 9 && .minute() === 0`)" --> W1B{Is 9:00 AM?}
+    Worker -- "4. Run Every Minute (* * * * *)\nGet Distinct User Timezones" --> DB
+
+    DB -- "Return Distinct Timezones" --> W1A[Loop Through Each Timezone]
+
+    W1A --> W1B{Is Local Time 09:00?}
+
     W1B -- "No" --> W1A
-    W1B -- "Yes" --> W1C[Store `tz`, `month`, `day` as Target Conditions]
+    W1B -- "Yes" --> W1C[Store Timezone, Month, Day\nas Target Conditions]
+
     W1C --> W1A
-    W1A -- "All Timezones Checked" --> W2A[5.1 MongoDB Aggregation Pipeline (Filter by `timezone` using `$in`)]
-    W2A -- "Apply `$dateToParts` for `birthday` using `timezone`" --> W2B[5.2 MongoDB Aggregation Pipeline (Filter by `localBirthday.month` and `localBirthday.day`)]
-    W2B -- "Return Users with Birthday Today\nin those Timezones" --> W3{Iterate Target Users}
-    
-    W3 --> W6[Send 'Happy Birthday' Message (console.log)]
+
+    W1A -- "All Timezones Checked" --> W2A[Aggregation Pipeline\nFilter by Target Timezones]
+
+    W2A --> W2B[Extract Birthday Month and Day]
+
+    W2B --> DB
+
+    DB -- "Return Users with Birthday Today" --> W3{Iterate Target Users}
+
+    W3 --> W6[Send Happy Birthday Message]
     W6 --> Log
     W6 --> W3
 ```
