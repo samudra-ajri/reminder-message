@@ -15,47 +15,6 @@ This project is a backend application that stores user data (with birthdays) and
 
 The application follows Clean Architecture and Domain-Driven Design (DDD) principles:
 
-### Infrastructure & Process Flowchart
-
-```mermaid
-flowchart TD
-    %% Define Nodes
-    Client([Client / Postman])
-    API[Express API Service]
-    DB[(MongoDB Database)]
-    Worker([Node-Cron Worker])
-    Log[/Console Log / Email Service/]
-
-    %% User Management Flow
-    Client -- "1. HTTP Request (POST/GET/PUT/DELETE)" --> API
-    API -- "2. Validate Request (Joi)" --> API
-    API -- "3. CRUD Operations" --> DB
-
-    %% Worker Flow
-    Worker -- "4. Run Every Minute (* * * * *) Get Distinct User Timezones" --> DB
-
-    DB -- "Return Distinct Timezones" --> W1A[Loop Through Each Timezone]
-
-    W1A --> W1B{Is Local Time 09:00?}
-
-    W1B -- "No" --> W1A
-    W1B -- "Yes" --> W1C[Store Timezone, Month, Day as Target Conditions]
-
-    W1C --> W1A
-
-    W1A -- "All Timezones Checked" --> W2A[Aggregation Pipeline Filter by Target Timezones]
-
-    W2A --> W2B[Extract Birthday Month and Day]
-
-    W2B --> DB
-
-    DB -- "Return Users with Birthday Today" --> W3{Iterate Target Users}
-
-    W3 --> W6[Send Happy Birthday Message]
-    W6 --> Log
-    W6 --> W3
-```
-
 ### Components
 - **Controllers** handle HTTP requests and input validation (using Joi).
 - **Services** encapsulate the core business logic.
